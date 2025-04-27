@@ -1,68 +1,84 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect } from 'react';
+import { accountsService } from '../services/accountsService';
+import * as Sentry from '@sentry/browser';
 
-const AccountsList = ({ accounts, loading, error, onDelete }) => {
-  const [filter, setFilter] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
+const AccountsList = ({ onEdit, onDelete }) => {
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
-  // Group accounts by category
-  const groupedAccounts = accounts.reduce((acc, account) => {
-    const category = account.categoryName || 'Uncategorized';
-    if (!acc[category]) {
-      acc[category] = [];
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+  
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await accountsService.getAllAccounts();
+      setAccounts(data);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      Sentry.captureException(error);
+      setError('Failed to load accounts. Please try again later.');
+    } finally {
+      setLoading(false);
     }
-    acc[category].push(account);
-    return acc;
-  }, {});
+  };
   
-  // Filter accounts
-  const filteredGroupedAccounts = {};
-  Object.keys(groupedAccounts).forEach(category => {
-    const filteredAccounts = groupedAccounts[category].filter(account => 
-      account.code.toLowerCase().includes(filter.toLowerCase()) || 
-      account.name.toLowerCase().includes(filter.toLowerCase())
+  const handleEdit = (account) => {
+    if (onEdit) onEdit(account);
+  };
+  
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this account?')) {
+      try {
+        await accountsService.deleteAccount(id);
+        setAccounts(accounts.filter(account => account.id !== id));
+        if (onDelete) onDelete(id);
+      } catch (error) {
+        console.error('Error deleting account:', error);
+        Sentry.captureException(error);
+        alert('Failed to delete account. Please try again.');
+      }
+    }
+  };
+  
+  const filteredAccounts = accounts.filter(account => {
+    return (
+      account.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.categoryName.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    
-    if (filteredAccounts.length > 0) {
-      filteredGroupedAccounts[category] = filteredAccounts;
-    }
   });
-  
-  const handleDeleteClick = (accountId) => {
-    setConfirmDelete(accountId);
-  };
-  
-  const handleConfirmDelete = () => {
-    if (confirmDelete) {
-      onDelete(confirmDelete);
-      setConfirmDelete(null);
-    }
-  };
-  
-  const handleCancelDelete = () => {
-    setConfirmDelete(null);
-  };
   
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex justify-center items-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <span className="ml-2">Loading accounts...</span>
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="bg-red-50 border-l-4 border-red-400 p-4">
+      <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
         <div className="flex">
           <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
           </div>
           <div className="ml-3">
             <p className="text-sm text-red-700">{error}</p>
+            <button
+              onClick={fetchAccounts}
+              className="mt-2 text-sm text-red-700 hover:text-red-600 font-medium cursor-pointer"
+            >
+              Try again
+            </button>
           </div>
         </div>
       </div>
@@ -70,129 +86,68 @@ const AccountsList = ({ accounts, loading, error, onDelete }) => {
   }
   
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="w-64">
-          <input
-            type="text"
-            placeholder="Cari akun..."
-            className="form-input"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </div>
-        <div>
-          <span className="text-sm text-gray-500">
-            Total Akun: <span className="font-medium">{accounts.length}</span>
-          </span>
-        </div>
+    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg bg-white">
+      <div className="p-4 border-b">
+        <input
+          type="text"
+          placeholder="Search accounts..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="box-border w-full p-2 border border-gray-300 rounded-md"
+        />
       </div>
       
-      {Object.keys(filteredGroupedAccounts).length === 0 ? (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md p-6 text-center text-gray-500">
-          Tidak ada akun yang ditemukan.
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {Object.keys(filteredGroupedAccounts).map(category => (
-            <div key={category} className="bg-white shadow overflow-hidden sm:rounded-md">
-              <div className="px-4 py-5 bg-gray-50 sm:px-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">{category}</h3>
-              </div>
-              <ul className="divide-y divide-gray-200">
-                {filteredGroupedAccounts[category].map(account => (
-                  <li key={account.id} className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <span className="bg-blue-100 text-blue-800 text-xs font-medium mr-3 px-2.5 py-0.5 rounded">
-                          {account.code}
-                        </span>
-                        <span className="text-gray-900 font-medium">{account.name}</span>
-                        {!account.isActive && (
-                          <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            Tidak Aktif
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <Link 
-                          to={`/accounts/edit/${account.id}`} 
-                          className="text-blue-600 hover:text-blue-800 cursor-pointer"
-                        >
-                          <PencilSquareIcon className="h-5 w-5" />
-                        </Link>
-                        <button 
-                          className="text-red-600 hover:text-red-800 cursor-pointer"
-                          onClick={() => handleDeleteClick(account.id)}
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-                    {account.description && (
-                      <p className="mt-1 text-sm text-gray-500">{account.description}</p>
-                    )}
-                    <div className="mt-2 text-xs text-gray-500">
-                      <span className={`mr-3 ${account.normalBalance === 'debit' ? 'text-green-600' : 'text-red-600'}`}>
-                        Saldo Normal: {account.normalBalance === 'debit' ? 'Debit' : 'Kredit'}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-      
-      {/* Confirmation Modal */}
-      {confirmDelete && (
-        <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                      Hapus Akun
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        Apakah Anda yakin ingin menghapus akun ini? Tindakan ini tidak dapat dibatalkan dan dapat mempengaruhi data transaksi yang terkait.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button 
-                  type="button" 
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm cursor-pointer"
-                  onClick={handleConfirmDelete}
-                >
-                  Hapus
-                </button>
-                <button 
-                  type="button" 
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm cursor-pointer"
-                  onClick={handleCancelDelete}
-                >
-                  Batal
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-300">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Code</th>
+              <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
+              <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Category</th>
+              <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Normal Balance</th>
+              <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+              <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {filteredAccounts.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="px-3 py-4 text-sm text-gray-500 text-center">
+                  No accounts found
+                </td>
+              </tr>
+            ) : (
+              filteredAccounts.map((account) => (
+                <tr key={account.id}>
+                  <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">{account.code}</td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{account.name}</td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{account.categoryName}</td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 capitalize">{account.normalBalance}</td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {account.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <button
+                      onClick={() => handleEdit(account)}
+                      className="text-blue-600 hover:text-blue-900 mr-4 cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(account.id)}
+                      className="text-red-600 hover:text-red-900 cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

@@ -5,6 +5,7 @@ import App from './App';
 import './index.css';
 import * as Sentry from '@sentry/browser';
 import { AuthProvider } from '@/modules/auth/AuthProvider';
+import { seedInitialData } from './indexedDb';
 
 // Initialize Sentry
 Sentry.init({
@@ -39,6 +40,12 @@ if (import.meta.env.VITE_PUBLIC_APP_ENV !== 'development') {
   script.setAttribute('data-website-id', import.meta.env.VITE_PUBLIC_UMAMI_WEBSITE_ID);
   document.head.appendChild(script);
 }
+
+// Initialize IndexedDB with seed data
+seedInitialData().catch(error => {
+  console.error('Failed to seed initial data:', error);
+  Sentry.captureException(error);
+});
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

@@ -14,7 +14,6 @@ import FixedAssetsPage from '@/modules/fixedAssets/pages/FixedAssetsPage';
 import SettingsPage from '@/modules/settings/pages/SettingsPage';
 import LandingPage from '@/modules/landing/LandingPage';
 import LoadingScreen from '@/modules/core/components/LoadingScreen';
-import ZaptBadge from '@/modules/core/components/ZaptBadge';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -118,8 +117,6 @@ export default function App() {
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      
-      <ZaptBadge />
     </div>
   );
 }

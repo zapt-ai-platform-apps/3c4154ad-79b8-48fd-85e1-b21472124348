@@ -1,15 +1,14 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
-import { supabase, recordLogin } from '@/supabaseClient';
 import { eventBus } from '@/modules/core/events/eventBus';
 import { events } from '@/modules/auth/events';
 import * as Sentry from '@sentry/browser';
+import { authService } from './authService';
 
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [hasRecordedLogin, setHasRecordedLogin] = useState(false);
   const hasSessionRef = useRef(false);
 
   // Use this function to update session so we also update our ref
@@ -22,8 +21,7 @@ export const AuthProvider = ({ children }) => {
     // Check active session on initial mount
     const checkSession = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        const { data } = await authService.getSession();
         
         // Set initial session
         updateSession(data.session);
@@ -41,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     checkSession();
     
     // Set up auth state change listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const authListener = authService.onAuthStateChange(async (event, newSession) => {
       console.log('Auth event:', event, 'Has session:', hasSessionRef.current);
       
       // For SIGNED_IN, only update session if we don't have one
@@ -50,40 +48,26 @@ export const AuthProvider = ({ children }) => {
           updateSession(newSession);
           if (newSession?.user?.email) {
             eventBus.publish(events.USER_SIGNED_IN, { user: newSession.user });
-            setHasRecordedLogin(false);
           }
         } else {
           console.log('Already have session, ignoring SIGNED_IN event');
         }
       }
-      // For TOKEN_REFRESHED, always update the session
-      else if (event === 'TOKEN_REFRESHED') {
-        updateSession(newSession);
-      }
       // For SIGNED_OUT, clear the session
       else if (event === 'SIGNED_OUT') {
         updateSession(null);
         eventBus.publish(events.USER_SIGNED_OUT, {});
-        setHasRecordedLogin(false);
       }
     });
     
     return () => {
-      authListener?.subscription.unsubscribe();
+      authListener?.data?.subscription?.unsubscribe();
     };
   }, []); 
 
-  useEffect(() => {
-    if (session?.user?.email && !hasRecordedLogin) {
-      recordLogin(session.user.email, import.meta.env.VITE_PUBLIC_APP_ENV);
-      setHasRecordedLogin(true);
-    }
-  }, [session, hasRecordedLogin]);
-
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await authService.signOut();
     } catch (error) {
       console.error('Error signing out:', error);
       Sentry.captureException(error);

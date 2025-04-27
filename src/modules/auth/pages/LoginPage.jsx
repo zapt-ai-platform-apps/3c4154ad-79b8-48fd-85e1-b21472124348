@@ -1,9 +1,7 @@
-import React from 'react';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { supabase } from '@/supabaseClient';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import * as Sentry from '@sentry/browser';
-import { Link } from 'react-router-dom';
+import { authService } from '../authService';
 
 function isInAppBrowser() {
   const userAgent = navigator.userAgent || window.opera;
@@ -19,7 +17,49 @@ function isInAppBrowser() {
 }
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showRegister, setShowRegister] = useState(false);
   const inAppBrowser = isInAppBrowser();
+  const navigate = useNavigate();
+  
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await authService.login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Login error:', err);
+      Sentry.captureException(err);
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await authService.register(email, password);
+      // Auto login after registration
+      await authService.login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Registration error:', err);
+      Sentry.captureException(err);
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
@@ -41,12 +81,9 @@ export default function LoginPage() {
         
         <div className="bg-white py-8 px-4 shadow-md rounded-lg sm:px-10">
           <div className="text-center mb-6">
-            <h2 className="text-xl font-medium text-gray-900">Sign in with ZAPT</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              <a href="https://www.zapt.ai" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">
-                Learn more about ZAPT
-              </a>
-            </p>
+            <h2 className="text-xl font-medium text-gray-900">
+              {showRegister ? 'Create an Account' : 'Sign in to Your Account'}
+            </h2>
           </div>
           
           {inAppBrowser ? (
@@ -59,53 +96,98 @@ export default function LoginPage() {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
-                    Anda membuka aplikasi ini dalam browser dalam aplikasi. Untuk menggunakan fitur login sosial, silakan buka aplikasi ini di browser default perangkat Anda.
+                    Anda membuka aplikasi ini dalam browser dalam aplikasi. Silakan buka aplikasi ini di browser default perangkat Anda untuk pengalaman optimal.
                   </p>
                 </div>
               </div>
             </div>
           ) : null}
           
-          <Auth
-            supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
-            providers={inAppBrowser ? [] : ['google', 'facebook', 'apple']}
-            magicLink={true}
-            view="magic_link"
-            theme="light"
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: 'Alamat Email',
-                  password_label: 'Kata Sandi',
-                  email_input_placeholder: 'Masukkan alamat email Anda',
-                  password_input_placeholder: 'Masukkan kata sandi Anda',
-                  button_label: 'Masuk',
-                  loading_button_label: 'Sedang Masuk...',
-                  link_text: 'Sudah memiliki akun? Masuk',
-                  social_provider_text: 'Masuk dengan {{provider}}',
-                },
-                sign_up: {
-                  email_label: 'Alamat Email',
-                  password_label: 'Kata Sandi',
-                  email_input_placeholder: 'Masukkan alamat email Anda',
-                  password_input_placeholder: 'Masukkan kata sandi Anda',
-                  button_label: 'Daftar',
-                  loading_button_label: 'Sedang Mendaftar...',
-                  link_text: 'Belum memiliki akun? Daftar',
-                  social_provider_text: 'Daftar dengan {{provider}}',
-                },
-                magic_link: {
-                  email_input_label: 'Alamat Email',
-                  email_input_placeholder: 'Masukkan alamat email Anda',
-                  button_label: 'Kirim Link Magic',
-                  loading_button_label: 'Mengirim Link...',
-                  link_text: 'Kirim link magic ke email',
-                  confirmation_text: 'Periksa email Anda untuk link magic',
-                },
-              },
-            }}
-          />
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <form onSubmit={showRegister ? handleRegister : handleLogin}>
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Alamat Email
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="box-border appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Kata Sandi
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete={showRegister ? "new-password" : "current-password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="box-border appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                      {showRegister ? 'Mendaftar...' : 'Masuk...'}
+                    </span>
+                  ) : (
+                    showRegister ? 'Daftar' : 'Masuk'
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+          
+          <div className="mt-6">
+            <button
+              onClick={() => setShowRegister(!showRegister)}
+              className="w-full text-center text-sm text-blue-600 hover:text-blue-500 cursor-pointer"
+            >
+              {showRegister
+                ? 'Sudah memiliki akun? Masuk'
+                : 'Belum memiliki akun? Daftar'}
+            </button>
+          </div>
           
           <div className="mt-8 text-center">
             <Link to="/" className="text-blue-500 hover:text-blue-700 text-sm">
