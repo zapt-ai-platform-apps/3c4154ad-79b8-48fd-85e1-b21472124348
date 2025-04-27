@@ -1,7 +1,7 @@
 {
-    "name": "reactjs-vite-tailwind-vercel",
+    "name": "sistem-akuntansi-manufaktur",
     "version": "1.0.0",
-    "description": "ReactJS app with Vite, Tailwind",
+    "description": "Aplikasi perangkat lunak akuntansi untuk perusahaan manufaktur dan industri",
     "type": "module",
     "scripts": {
         "dev": "vite",
@@ -10,9 +10,19 @@
         "start": "vite --host"
     },
     "dependencies": {
+        "@headlessui/react": "^1.7.18",
+        "@heroicons/react": "^2.1.1",
         "@sentry/browser": "^8.41.0",
+        "date-fns": "^3.6.0",
+        "drizzle-orm": "^0.33.0",
+        "html2canvas": "^1.4.1",
+        "jspdf": "^2.5.1",
+        "postgres": "^3.4.5",
         "react": "^18.2.0",
-        "react-dom": "^18.2.0"
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.22.3",
+        "react-hook-form": "^7.50.0",
+        "react-datepicker": "^6.2.0"
     },
     "devDependencies": {
         "@vitejs/plugin-react": "^4.3.4",
